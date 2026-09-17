@@ -1,0 +1,23 @@
+# Deployment dependencies for running a trained policy on the robot.
+#
+# This file is nearly empty, and that is the point.  The deployed policy is a
+# 90 KB MLP evaluated with NumPy, so a storage-limited robot needs none of
+# requirements-rl.txt -- PyTorch, Stable-Baselines3, gymnasium and TensorBoard
+# are roughly 1 GB of wheels that exist only to *train* the policy.  They are
+# installed on the development machine and never on the robot.
+#
+# NumPy itself is already present on any ROS 2 Jazzy system: it arrives with
+# python3-numpy, which rclpy depends on.  Listing it here is a declaration of
+# the requirement, not an instruction to install it -- a plain
+# `pip install -r requirements-deploy.txt` finds it already satisfied.
+#
+# Do not install NumPy with pip even if it appears to be missing.  A pip copy
+# would shadow the system package that rclpy and the ROS message types were
+# built against.  Use apt instead:
+#
+#     sudo apt install python3-numpy
+#
+# Check a machine is ready without installing anything:
+#
+#     python3 -c "import numpy, rclpy; print('deployment dependencies OK')"
+numpy>=1.20

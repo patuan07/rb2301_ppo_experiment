@@ -192,6 +192,66 @@ class ProjectFileTests(unittest.TestCase):
         source = requirements_path.read_text(encoding="utf-8")
         self.assertIn("setuptools>=68,<80", source)
 
+    def test_deployment_pipeline_is_installed(self):
+        setup_source = (
+            PROJECT / "src/rb2301_ca1/setup.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("deploy_policy", setup_source)
+        self.assertIn("export_policy", setup_source)
+        for script in ("setup_deploy.sh", "deploy_policy.sh", "export_policy.sh"):
+            path = PROJECT / script
+            self.assertTrue(path.is_file(), script)
+            self.assertTrue(path.stat().st_mode & 0o111, f"{script} is not executable")
+
+    def test_deployment_installs_the_exported_policy(self):
+        """The .npz is the deployable artefact, so colcon must install it.
+
+        ``setup.py`` has no ``package_data``, and an empty glob installs nothing
+        silently -- the failure would only surface on the robot, at run time.
+        """
+
+        setup_source = (
+            PROJECT / "src/rb2301_ca1/setup.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("glob.glob('policy/*.npz')", setup_source)
+        self.assertIn("policy_artifacts", setup_source)
+
+    def test_deployment_dependencies_exclude_the_training_stack(self):
+        """The point of the deploy path is that the robot installs no wheels."""
+
+        source = (
+            PROJECT / "requirements-deploy.txt"
+        ).read_text(encoding="utf-8")
+        required = "\n".join(
+            line for line in source.splitlines() if not line.strip().startswith("#")
+        )
+        self.assertIn("numpy", required)
+        for package in ("torch", "stable-baselines3", "gymnasium", "tensorboard"):
+            self.assertNotIn(package, required)
+
+    def test_deployment_setup_creates_no_environment(self):
+        """It may *mention* .venv and requirements-rl.txt, but never use them."""
+
+        source = (PROJECT / "setup_deploy.sh").read_text(encoding="utf-8")
+        self.assertNotIn("python3 -m venv", source)
+        self.assertNotIn("pip install", source)
+        self.assertNotIn("-r requirements-rl.txt", source)
+        self.assertIn("colcon build --symlink-install", source)
+
+    def test_deployment_runtime_avoids_the_training_stack(self):
+        for module in ("deploy_policy", "policy_runtime"):
+            source = (
+                PROJECT / f"src/rb2301_ca1/rb2301_ca1/{module}.py"
+            ).read_text(encoding="utf-8")
+            with self.subTest(module=module):
+                self.assertNotIn("stable_baselines3", source)
+                self.assertNotIn("import torch", source)
+        exporter = (
+            PROJECT / "src/rb2301_ca1/rb2301_ca1/export_policy.py"
+        ).read_text(encoding="utf-8")
+        # The exporter is the one module allowed to need them, and only off-robot.
+        self.assertIn("import torch", exporter)
+
 
 if __name__ == "__main__":
     unittest.main()
