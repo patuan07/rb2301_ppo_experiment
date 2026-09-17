@@ -1,0 +1,4 @@
+setuptools>=68,<80
+gymnasium>=0.29.1,<2.0
+stable-baselines3>=2.3.0,<3.0
+tensorboard>=2.14
